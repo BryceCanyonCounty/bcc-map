@@ -1,5 +1,5 @@
 local Core = exports.vorp_core:GetCore()
---local BccUtils = exports['bcc-utils'].initiate()
+local BccUtils = exports['bcc-utils'].initiate()
 ---@type BCCMapDebugLib
 local DBG = BCCMapDebug
 
@@ -55,4 +55,4 @@ Core.Callback.Register('bcc-map:CheckMapItem', function(source, cb)
     cb(hasValidItem)
 end)
 
---BccUtils.Versioner.checkFile(GetCurrentResourceName(), 'https://github.com/BryceCanyonCounty/bcc-map')
+BccUtils.Versioner.checkFile(GetCurrentResourceName(), 'https://github.com/BryceCanyonCounty/bcc-map')
