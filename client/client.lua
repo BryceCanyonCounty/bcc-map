@@ -5,7 +5,11 @@ local DBG = BCCMapDebug
 local MapControlStarted = false
 local hasMapItem = false
 local lastItemCheck = 0
-local itemCheckInterval = 5000 -- Check every 5 seconds
+local itemCheckInterval = 5000
+local lastNotificationTime = 0
+local notificationEnabled = Config.notifications.active
+local notificationTime = Config.notifications.time
+local notificationCooldown = Config.notifications.cooldownTime
 
 local function StartMapControl()
     CreateThread(function()
@@ -13,11 +17,11 @@ local function StartMapControl()
         DBG.Info('Map Control Started')
 
         while true do
-            local sleep = 1000 -- Default to 1 second sleep for optimization
+            local sleep = 1000
             local currentTime = GetGameTimer()
 
             if IsEntityDead(PlayerPedId()) then
-                sleep = 2000 -- Longer sleep when dead
+                sleep = 2000
                 goto END
             end
 
@@ -28,35 +32,39 @@ local function StartMapControl()
                 DBG.Info('Item check updated: ' .. tostring(hasMapItem))
             end
 
-            -- Only run input checks every frame when necessary
-            if not hasMapItem then
-                sleep = 0 -- Need to run every frame to disable controls and check inputs
+            -- Always check for map key press
+            if IsControlJustPressed(0, `INPUT_MAP`) then
+                if not hasMapItem then
+                    -- Player doesn't have item - close map immediately and show message
+                    DBG.Info('Player is trying to open the map without item')
 
-                -- Check for map key press
-                if IsControlJustPressed(0, `INPUT_MAP`) then
-                    DBG.Info('Player is trying to open the map')
-
-                    -- Check if map is open, if so close it
                     if Citizen.InvokeNative(0x4E511D093A86AD49, `MAP`) then -- IsUiappRunningByHash
                         Citizen.InvokeNative(0x04428420A248A354, `MAP`)     -- CloseUiappByHashImmediate
                     end
-                    Core.NotifyRightTip(_U('noMapItem'), 4000)
+
+                    -- Only show notification if enabled and cooldown has passed
+                    if notificationEnabled and currentTime - lastNotificationTime > notificationCooldown then
+                        Core.NotifyRightTip(_U('noMapItem'), notificationTime)
+                        lastNotificationTime = currentTime
+                    end
+
                     -- Force an immediate item check in case they just got the item
                     hasMapItem = Core.Callback.TriggerAwait('bcc-map:CheckMapItem')
                     lastItemCheck = currentTime
-                end
 
-                -- Continuously disable map control when player doesn't have required item
-                DisableControlAction(0, `INPUT_MAP`, true)
-                -- Also close map if it somehow gets opened
-                if Citizen.InvokeNative(0x4E511D093A86AD49, `MAP`) then -- IsUiappRunningByHash
-                    Citizen.InvokeNative(0x04428420A248A354, `MAP`)     -- CloseUiappByHashImmediate
-                end
-            else
-                -- Player has item, only need to check for map key press occasionally
-                if IsControlJustPressed(0, `INPUT_MAP`) then
+                    sleep = 0
+                else
                     DBG.Info('Player has map item and is opening map')
                     sleep = 100 -- Short sleep after successful map open
+                end
+            end
+
+            -- If player doesn't have item, constantly monitor and close map
+            if not hasMapItem then
+                sleep = 0
+                -- Force close map if it somehow gets opened
+                if Citizen.InvokeNative(0x4E511D093A86AD49, `MAP`) then -- IsUiappRunningByHash
+                    Citizen.InvokeNative(0x04428420A248A354, `MAP`)     -- CloseUiappByHashImmediate
                 end
             end
             ::END::
